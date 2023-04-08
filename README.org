@@ -1,0 +1,262 @@
+#+TITLE: Reverse Proxy with Plex
+#+AUTHOR: Artem Smaznov
+#+DESCRIPTION: Testing manual reverse proxy setup with plex as actual app
+#+STARTUP: overview
+#+auto_tangle: t
+
+* Working
++ http://localhost opens hello-world app correctly
++ http://localhost/app1 opens app1 app correctly (link to subdir doesn't work thought)
++ http://localhost/app2 opens app2 app correctly (link to subdir doesn't work thought)
++ http://localhost/app1/sub opens app1 subdir correctly
++ http://localhost/app2/sub opens app2 subdir correctly
++ http://localhost:32400/web opens plex just fine
+
+* Not working
++ http://localhost/plex/web gets a 404 as it seems to redirect http://localhost/web
+
+* Docker Compose
+:PROPERTIES:
+:header-args: :tangle docker-compose.yml
+:END:
+** Init Section
+Version
+#+begin_src yaml
+version: '2'
+#+end_src
+
+Networks
+#+begin_src yaml
+networks:
+  proxy-tier:
+#+end_src
+
+Start services block
+#+begin_src yaml
+services:
+#+end_src
+
+** Reverse Proxy
+#+begin_src yaml
+  proxy:
+    container_name: 'reverse-proxy'
+    image: nginx
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - ./reverse-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - proxy-tier
+#+end_src
+
+** App1
+#+begin_src yaml
+  app1:
+    container_name: "app1"
+    image: nginx
+    restart: always
+    volumes:
+      - ./app1/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./app1/www:/var/www:ro
+    networks:
+      - proxy-tier
+#+end_src
+
+** App2
+#+begin_src yaml
+  app2:
+    container_name: "app2"
+    image: nginx
+    restart: always
+    volumes:
+      - ./app2/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./app2/www:/var/www:ro
+    networks:
+      - proxy-tier
+#+end_src
+
+** Hello World
+#+begin_src yaml
+  hello-world:
+    container_name: "hello-world"
+    image: nginx
+    restart: always
+    ports:
+      - 8080:80
+    networks:
+      - proxy-tier
+#+end_src
+
+** Plex
+https://github.com/plexinc/pms-docker
+#+begin_src yaml
+  plex-media-server:
+    container_name: 'plex-media-server'
+    hostname: 'plex-media-server'
+    image: plexinc/pms-docker
+    restart: unless-stopped
+    ports:
+      - 32400:32400
+    # env_file:
+    #   - secrets/plex.env
+    environment:
+      - TZ=America/Toronto
+    networks:
+      - proxy-tier
+#+end_src
+
+* Nginx Config
+** Proxy
+#+begin_src conf :tangle reverse-proxy/default.conf
+server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        proxy_pass http://hello-world:80;
+    }
+
+    location /app1 {
+        rewrite ^/app1/(.*)$ /$1 break;
+        proxy_pass http://app1:8080/;
+    }
+
+    location /app2 {
+        rewrite ^/app2/(.*)$ /$1 break;
+        proxy_pass http://app2:8080/;
+    }
+
+    location /plex {
+        rewrite ^/plex/(.*)$ /$1 break;
+        proxy_pass http://plex-media-server:32400/;
+
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $http_connection;
+        proxy_set_header Host $host;
+    }
+}
+#+end_src
+
+** App1
+#+begin_src conf :tangle app1/default.conf
+server {
+    listen       8080;
+    listen  [::]:8080;
+    server_name  localhost;
+
+    root /var/www;
+
+    location / {
+        index  index.html index.htm;
+    }
+
+    location /sub {
+        index  sub.html;
+    }
+}
+#+end_src
+
+** App2
+#+begin_src conf :tangle app2/default.conf
+server {
+    listen       8080;
+    listen  [::]:8080;
+    server_name  localhost;
+
+    root /var/www;
+
+    location / {
+        index  index.html index.htm;
+    }
+
+    location /sub {
+        index  sub.html;
+    }
+}
+#+end_src
+
+* index.html
+** App1
+#+begin_src html :tangle app1/www/index.html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Artem Title!</title>
+    <style>
+      html {
+        color-scheme: light dark;
+      }
+      body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>App 1!</h1>
+    <a href="sub">Link</a>
+    <p>
+      If you see this page, the nginx web server is successfully installed and
+      working. Further configuration is required.
+    </p>
+
+    <p>
+      For online documentation and support please refer to
+      <a href="http://nginx.org/">nginx.org</a>.<br />
+      Commercial support is available at
+      <a href="http://nginx.com/">nginx.com</a>.
+    </p>
+
+    <p><em>Thank you for using nginx.</em></p>
+  </body>
+</html>
+#+end_src
+
+#+begin_src html :tangle app1/www/sub/sub.html
+OK 1
+#+end_src
+
+** App2
+#+begin_src html :tangle app2/www/index.html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Artem Title!</title>
+    <style>
+      html {
+        color-scheme: light dark;
+      }
+      body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>App 2!</h1>
+    <a href="sub/">Link</a>
+    <p>
+      If you see this page, the nginx web server is successfully installed and
+      working. Further configuration is required.
+    </p>
+
+    <p>
+      For online documentation and support please refer to
+      <a href="http://nginx.org/">nginx.org</a>.<br />
+      Commercial support is available at
+      <a href="http://nginx.com/">nginx.com</a>.
+    </p>
+
+    <p><em>Thank you for using nginx.</em></p>
+  </body>
+</html>
+#+end_src
+
+#+begin_src html :tangle app2/www/sub/sub.html
+OK 2
+#+end_src

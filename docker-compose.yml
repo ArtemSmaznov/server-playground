@@ -1,0 +1,61 @@
+version: '2'
+
+networks:
+  proxy-tier:
+
+services:
+
+  proxy:
+    container_name: 'reverse-proxy'
+    image: nginx
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - ./reverse-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - proxy-tier
+
+  app1:
+    container_name: "app1"
+    image: nginx
+    restart: always
+    volumes:
+      - ./app1/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./app1/www:/var/www:ro
+    networks:
+      - proxy-tier
+
+  app2:
+    container_name: "app2"
+    image: nginx
+    restart: always
+    volumes:
+      - ./app2/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./app2/www:/var/www:ro
+    networks:
+      - proxy-tier
+
+  hello-world:
+    container_name: "hello-world"
+    image: nginx
+    restart: always
+    ports:
+      - 8080:80
+    networks:
+      - proxy-tier
+
+  plex-media-server:
+    container_name: 'plex-media-server'
+    hostname: 'plex-media-server'
+    image: plexinc/pms-docker
+    restart: unless-stopped
+    ports:
+      - 32400:32400
+    # env_file:
+    #   - secrets/plex.env
+    environment:
+      - TZ=America/Toronto
+    networks:
+      - proxy-tier
