@@ -5,15 +5,15 @@
 #+auto_tangle: t
 
 * Working
-+ http://localhost opens hello-world app correctly
-+ http://localhost/app1 opens app1 app correctly (link to subdir doesn't work thought)
-+ http://localhost/app2 opens app2 app correctly (link to subdir doesn't work thought)
-+ http://localhost/app1/sub opens app1 subdir correctly
-+ http://localhost/app2/sub opens app2 subdir correctly
-+ http://localhost:32400/web opens plex just fine
++ [[http://localhost]] opens hello-world app correctly
++ [[http://localhost/app1]] opens app1 app correctly (link to subdir doesn't work thought)
++ [[http://localhost/app2]] opens app2 app correctly (link to subdir doesn't work thought)
++ [[http://localhost/app1/sub]] opens app1 subdir correctly
++ [[http://localhost/app2/sub]] opens app2 subdir correctly
++ [[http://localhost:32400/web]] opens plex just fine
 
 * Not working
-+ http://localhost/plex/web gets a 404 as it seems to redirect http://localhost/web
++ [[http://localhost/plex/web]] gets a 404 as it seems to redirect [[http://localhost/web]]
 
 * Docker Compose
 :PROPERTIES:
