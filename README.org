@@ -110,32 +110,52 @@ https://github.com/plexinc/pms-docker
 * Nginx Config
 ** Proxy
 #+begin_src conf :tangle reverse-proxy/default.conf
+upstream app1 {
+    server app1:8080;
+}
+
+upstream app2 {
+    server app2:8080;
+    keepalive 32;
+}
+
+upstream plex {
+    server plex-media-server:32400;
+    keepalive 32;
+}
+
 server {
     listen 80;
-    server_name localhost;
+    server_name  localhost;
 
-    location / {
-        proxy_pass http://hello-world:80;
+    # Disable buffering - send to the client as soon as the data is received from Plex.
+    proxy_redirect off;
+    proxy_buffering off;
+
+    location ~* ^/app1/(.*)$ {
+        proxy_pass http://app1/$1$is_args$args;
     }
 
-    location /app1 {
-        rewrite ^/app1/(.*)$ /$1 break;
-        proxy_pass http://app1:8080/;
+    location ~* ^/app2/(.*)$ {
+        proxy_pass http://app2/$1$is_args$args;
     }
 
-    location /app2 {
-        rewrite ^/app2/(.*)$ /$1 break;
-        proxy_pass http://app2:8080/;
-    }
+    location ~* ^/plex/(.*)$ {
+        proxy_pass http://plex/$1$is_args$args;
 
-    location /plex {
-        rewrite ^/plex/(.*)$ /$1 break;
-        proxy_pass http://plex-media-server:32400/;
-
-        proxy_set_header Accept-Encoding "";
+        # Set headers for Plex server.
+        proxy_http_version 1.1;
+        # proxy_set_header Host $host;
+        proxy_set_header Host localhost; # Forces Plex to see all connections from the proxy as local
+        proxy_set_header Referer localhost; # Forces Plex to see all connections from the proxy as local
+        proxy_set_header Origin $scheme://localhost:$server_port; # Forces Plex to see all connections from the proxy as local
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $http_connection;
-        proxy_set_header Host $host;
+        # proxy_set_header Connection $http_connection;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Accept-Encoding ""; # Disables compression between Plex and Nginx
     }
 }
 #+end_src
@@ -198,7 +218,7 @@ server {
   </head>
   <body>
     <h1>App 1!</h1>
-    <a href="sub">Link</a>
+    <a href="sub/">Link</a>
     <p>
       If you see this page, the nginx web server is successfully installed and
       working. Further configuration is required.
