@@ -110,6 +110,10 @@ https://github.com/plexinc/pms-docker
 * Nginx Config
 ** Proxy
 #+begin_src conf :tangle reverse-proxy/default.conf
+upstream home-assistant {
+    server art-s.tplinkdns.com:8123;
+}
+
 upstream app1 {
     server app1:8080;
 }
@@ -119,18 +123,22 @@ upstream app2 {
     keepalive 32;
 }
 
-upstream plex {
+upstream plex-media-server {
     server plex-media-server:32400;
     keepalive 32;
 }
 
 server {
     listen 80;
-    server_name  localhost;
+    server_name  art-s.tplinkdns.com;
 
     # Disable buffering - send to the client as soon as the data is received from Plex.
     proxy_redirect off;
     proxy_buffering off;
+
+    location ~* ^/ha/(.*)$ {
+        proxy_pass https://home-assistant/$1$is_args$args;
+    }
 
     location ~* ^/app1/(.*)$ {
         proxy_pass http://app1/$1$is_args$args;
@@ -141,7 +149,7 @@ server {
     }
 
     location ~* ^/plex/(.*)$ {
-        proxy_pass http://plex/$1$is_args$args;
+        proxy_pass http://plex-media-server/$1$is_args$args;
 
         # Set headers for Plex server.
         proxy_http_version 1.1;
