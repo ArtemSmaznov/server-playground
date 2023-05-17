@@ -5,13 +5,15 @@
 #+auto_tangle: t
 
 * Working
-+ [[http://localhost/app1/]] opens app1 app correctly with working link
-+ [[http://localhost/app2/]] opens app2 app correctly with working link
-+ [[http://localhost:32400]] opens plex just fine
++ [[http://localhost/app1/]] fully works
++ [[http://localhost/app2/]] fully works
++ [[http://localhost:32400]] plex fully works
++ [[http://localhost:8080]] nextcloud fully works
 
 * Not working
-+ [[http://localhost/plex/]] opens ~This XML file does not appear to have any style information associated with it. The document tree is shown below.~ message with some xml file
-+ http://localhost/ha/ opens only app logo (might be expected)
++ [[http://localhost/nextcloud/]] opens with no graphics
++ [[http://localhost/plex/]] opens blank page (on startup some xml is seen) - looks similar to no graphics
++ [[http://localhost/ha/]] opens only app logo (not a container)
 
 * Docker Compose
 :PROPERTIES:
@@ -314,7 +316,7 @@ server {
     }
 
     location ~* ^/plex/(.*)$ {
-        proxy_pass http://plex-media-server/web/$1$is_args$args;
+        proxy_pass http://plex-media-server/$1$is_args$args;
 
         # Set headers for Plex server.
         proxy_set_header X-Forwarded-For $remote_addr;
