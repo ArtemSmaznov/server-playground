@@ -20,13 +20,16 @@
 ** Init Section
 Version
 #+begin_src yaml
-version: '2'
+version: '3'
 #+end_src
 
 Volumes
 #+begin_src yaml
 volumes:
+  db:
   certs:
+  acme:
+  html:
 #+end_src
 
 Networks
@@ -50,11 +53,90 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - certs:/etc/nginx/certs:ro
-      - ./reverse-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs:z,ro
+      - html:/usr/share/nginx/html:z
+      - ./reverse-proxy/default.conf:/etc/nginx/conf.d/default.conf:z,ro
+      - /var/run/docker.sock:/tmp/docker.sock:z,ro
     networks:
       - proxy-tier
+#+end_src
+
+** Nextcloud
+*** Server
+#+begin_src yaml
+  nextcloud-server:
+    image: nginx:alpine
+    container_name: 'nextcloud-server'
+    restart: always
+    depends_on:
+      - nextcloud-app
+    ports:
+      - 8080:80
+    env_file:
+      - secrets/domain.env
+    volumes:
+      - /home/nextcloud2:/var/www/html:z,ro
+      - ./nextcloud/server/nginx.conf:/etc/nginx/nginx.conf:z,ro
+    networks:
+      - proxy-tier
+      - default
+#+end_src
+
+*** App
+#+begin_src yaml
+  nextcloud-app:
+    image: nextcloud:fpm-alpine
+    container_name: 'nextcloud-app'
+    restart: always
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    environment:
+      - MYSQL_HOST=nextcloud-db
+      - REDIS_HOST=nextcloud-redis
+    env_file:
+      - secrets/db.env
+    volumes:
+      - /home/nextcloud2:/var/www/html:z
+#+end_src
+
+*** Cron
+#+begin_src yaml
+  nextcloud-cron:
+    image: nextcloud:fpm-alpine
+    container_name: 'nextcloud-cron'
+    restart: always
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    entrypoint: /cron.sh
+    volumes:
+      - /home/nextcloud2:/var/www/html:z
+#+end_src
+
+*** Database
+#+begin_src yaml
+  nextcloud-db:
+    image: mariadb
+    container_name: 'nextcloud-db'
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      - MARIADB_AUTO_UPGRADE=1
+      - MARIADB_DISABLE_UPGRADE_BACKUP=1
+    env_file:
+      - secrets/db.env
+      - secrets/db-root.env
+    volumes:
+      - db:/var/lib/mysql:Z
+#+end_src
+
+*** Redis
+#+begin_src yaml
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: 'nextcloud-redis'
+    restart: always
 #+end_src
 
 ** App1
@@ -83,18 +165,6 @@ services:
       - proxy-tier
 #+end_src
 
-** Hello World
-#+begin_src yaml
-  hello-world:
-    container_name: "hello-world"
-    image: nginx
-    restart: always
-    ports:
-      - 8080:80
-    networks:
-      - proxy-tier
-#+end_src
-
 ** Plex
 https://github.com/plexinc/pms-docker
 #+begin_src yaml
@@ -113,6 +183,18 @@ https://github.com/plexinc/pms-docker
       - proxy-tier
 #+end_src
 
+** Hello World
+#+begin_src yaml
+  hello-world:
+    container_name: "hello-world"
+    image: nginx
+    restart: always
+    ports:
+      - 8085:80
+    networks:
+      - proxy-tier
+#+end_src
+
 * Nginx Config
 ** Proxy
 #+begin_src conf :tangle reverse-proxy/default.conf
@@ -127,6 +209,10 @@ upstream app1 {
 upstream app2 {
     server app2:8080;
     keepalive 32;
+}
+
+upstream nextcloud-server {
+    server nextcloud-server:80;
 }
 
 upstream plex-media-server {
@@ -221,6 +307,10 @@ server {
 
     location ~* ^/app2/(.*)$ {
         proxy_pass http://app2/$1$is_args$args;
+    }
+
+    location ~* ^/nextcloud/(.*)$ {
+        proxy_pass http://nextcloud-server/$1$is_args$args;
     }
 
     location ~* ^/plex/(.*)$ {
