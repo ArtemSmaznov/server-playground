@@ -116,28 +116,6 @@ https://github.com/plexinc/pms-docker
 * Nginx Config
 ** Proxy
 #+begin_src conf :tangle reverse-proxy/default.conf
-# Default dhparam
-ssl_dhparam /etc/nginx/dhparam/dhparam.pem;
-
-access_log off;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
-    ssl_prefer_server_ciphers off;
-
-error_log /dev/stderr;
-
-# HTTP 1.1 support
-proxy_http_version 1.1;
-proxy_buffering off;
-proxy_set_header Host $http_host;
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto $scheme;
-proxy_set_header X-Original-URI $request_uri;
-
-# Mitigate httpoxy attack (see README for details)
-proxy_set_header Proxy "";
-
 upstream home-assistant {
     server art-s.tplinkdns.com:8123;
 }
@@ -153,7 +131,6 @@ upstream app2 {
 
 upstream plex-media-server {
     server plex-media-server:32400;
-    keepalive 32;
 }
 
 #===============================================================================
@@ -161,13 +138,13 @@ upstream plex-media-server {
 server {
     listen       80;
     server_name  art-s.tplinkdns.com;
-    access_log   /var/log/nginx/access.log;
 
     # Do not HTTPS redirect Let's Encrypt ACME challenge
     location ^~ /.well-known/acme-challenge/ {
         auth_basic off;
         auth_request off;
         allow all;
+
         root /usr/share/nginx/html;
         try_files $uri =404;
         break;
@@ -181,27 +158,56 @@ server {
 server {
     listen       443 ssl http2;
     server_name  art-s.tplinkdns.com;
-    access_log   /var/log/nginx/access.log;
+    client_max_body_size 500M;
+    send_timeout 100m;
 
     # ssl
-    ssl_session_timeout 5m;
-    ssl_session_cache shared:SSL:50m;
-    ssl_session_tickets off;
+    # ssl_session_timeout 5m;
+    ssl_session_cache builtin:1000 shared:SSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'TLS-CHACHA20-POLY1305-SHA256:TLS-AES-256-GCM-SHA384:TLS-AES-128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256';
+    ssl_stapling on;
+    ssl_stapling_verify on;
     ssl_certificate /etc/nginx/certs/art-s.tplinkdns.com.crt;
     ssl_certificate_key /etc/nginx/certs/art-s.tplinkdns.com.key;
     ssl_dhparam /etc/nginx/certs/art-s.tplinkdns.com.dhparam.pem;
-    ssl_stapling on;
-    ssl_stapling_verify on;
     ssl_trusted_certificate /etc/nginx/certs/art-s.tplinkdns.com.chain.pem;
 
-    # REVIEW from auto proxy
-    set $sts_header "";
-    if ($https) {
-        set $sts_header "max-age=31536000";
-    }
-    add_header Strict-Transport-Security $sts_header always;
+    add_header Strict-Transport-Security max-age=15768000;
+    add_header Referrer-Policy strict-origin-when-cross-origin;
+    add_header X-Frame-Options deny;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    # add_header Permissions-Policy "geolocation=(self), midi=(self), sync-xhr=(self), microphone=(self), camera=(self), magnetometer=(self), gyroscope=(self), fullscreen=(self), payment=(self)";
+    # # Pay attention to how many domains we need to allow
+    # add_header Content-Security-Policy "default-src 'none'; base-uri 'self' art-s.tplinkdns.com; font-src 'self' data: art-s.tplinkdns.com; media-src 'self' data: blob: art-s.tplinkdns.com https://*.plex.direct:32400 https://video.internetvideoarchive.net https://*.cloudfront.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' domain.com art-s.tplinkdns.com; style-src 'self' 'unsafe-inline' art-s.tplinkdns.com; img-src 'self' data: blob: https: art-s.tplinkdns.com; worker-src * blob:; frame-src 'self'; connect-src 'self' https: domain.com art-s.tplinkdns.com wss://*.plex.direct:32400 wss://pubsub.plex.tv; object-src 'self' art-s.tplinkdns.com; frame-ancestors 'self' domain.com art-s.tplinkdns.com; form-action 'self' art-s.tplinkdns.com; manifest-src 'self' art-s.tplinkdns.com; script-src-elem 'self' 'unsafe-inline' domain.com art-s.tplinkdns.com www.gstatic.com";
 
-    # REVIEW (plex) Disable buffering - send to the client as soon as the data is received from Plex.
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1000;
+    gzip_proxied any;
+    gzip_types text/plain text/css text/xml application/xml text/javascript application/x-javascript image/svg+xml;
+    gzip_disable "MSIE [1-6]\.";
+
+    # HTTP 1.1 support
+    proxy_http_version 1.1;
+    proxy_set_header Host $host; # Forward real ip and host to Plex
+    proxy_set_header X-Real-IP $remote_addr; # Forward real ip and host to Plex
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_set_header Sec-WebSocket-Extensions $http_sec_websocket_extensions;
+    proxy_set_header Sec-WebSocket-Key $http_sec_websocket_key;
+    proxy_set_header Sec-WebSocket-Version $http_sec_websocket_version;
+
+    # Disables compression between Plex and Nginx, required if using sub_filter below.
+    # May also improve loading time by a very marginal amount, as nginx will compress anyway.
+    #proxy_set_header Accept-Encoding "";
+
+    # Mitigate httpoxy attack (see README for details)
+    # proxy_set_header Proxy "";
+
+    # Disable buffering - send to the client as soon as the data is received from Plex.
     proxy_redirect off;
     proxy_buffering off;
 
@@ -218,13 +224,16 @@ server {
     }
 
     location ~* ^/plex/(.*)$ {
-        proxy_pass http://plex-media-server/$1$is_args$args;
+        proxy_pass http://plex-media-server/web/$1$is_args$args;
 
         # Set headers for Plex server.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_ssl_verify off;
         proxy_http_version 1.1;
-        proxy_set_header Referer localhost; # Forces Plex to see all connections from the proxy as local
-        proxy_set_header Origin $scheme://localhost:$server_port; # Forces Plex to see all connections from the proxy as local
-        proxy_set_header Accept-Encoding ""; # Disables compression between Plex and Nginx
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
     }
 
     location / {
