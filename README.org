@@ -63,6 +63,24 @@ services:
       - proxy-tier
 #+end_src
 
+** Home Assistant
+#+begin_src yaml
+  homeassistant:
+    container_name: 'homeassistant'
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    restart: always
+    ports:
+      - 8123:8123
+    volumes:
+      - /home/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    devices:
+      - /dev/bus/usb/003/002:/dev/bus/usb/003/002
+    privileged: true
+    networks:
+      - proxy-tier
+#+end_src
+
 ** Nextcloud
 *** Server
 #+begin_src yaml
@@ -201,7 +219,7 @@ https://github.com/plexinc/pms-docker
 ** Proxy
 #+begin_src conf :tangle reverse-proxy/default.conf
 upstream home-assistant {
-    server art-s.tplinkdns.com:8123;
+    server homeassistant:8123;
 }
 
 upstream app1 {
