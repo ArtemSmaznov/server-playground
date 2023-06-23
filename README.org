@@ -79,6 +79,7 @@ services:
     privileged: true
     networks:
       - proxy-tier
+      - default
 #+end_src
 
 ** Nextcloud
