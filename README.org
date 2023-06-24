@@ -348,7 +348,8 @@ server {
     }
 
     location / {
-        return 404;
+        # return 404;
+        proxy_pass https://homeassistant:8123/$args;
     }
 }
 #+end_src
