@@ -397,7 +397,7 @@ server {
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Artem Title!</title>
+    <title>1st App!</title>
     <style>
       html {
         color-scheme: light dark;
@@ -407,10 +407,14 @@ server {
         margin: 0 auto;
         font-family: Tahoma, Verdana, Arial, sans-serif;
       }
+      h1 {
+        color: blue;
+      }
     </style>
   </head>
   <body>
     <h1>App 1!</h1>
+    <img src="logo.svg">
     <a href="sub/">Link</a>
     <p>
       If you see this page, the nginx web server is successfully installed and
@@ -430,6 +434,7 @@ server {
 #+end_src
 
 #+begin_src html :tangle app1/www/sub/sub.html
+<img src="../logo.svg">
 OK 1
 #+end_src
 
@@ -438,7 +443,7 @@ OK 1
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Artem Title!</title>
+    <title>2ns App!</title>
     <style>
       html {
         color-scheme: light dark;
@@ -448,10 +453,14 @@ OK 1
         margin: 0 auto;
         font-family: Tahoma, Verdana, Arial, sans-serif;
       }
+      h1 {
+        color: green;
+      }
     </style>
   </head>
   <body>
     <h1>App 2!</h1>
+    <img src="logo.svg">
     <a href="sub/">Link</a>
     <p>
       If you see this page, the nginx web server is successfully installed and
@@ -471,5 +480,6 @@ OK 1
 #+end_src
 
 #+begin_src html :tangle app2/www/sub/sub.html
+<img src="../logo.svg">
 OK 2
 #+end_src
