@@ -318,10 +318,6 @@ server {
     proxy_redirect off;
     proxy_buffering off;
 
-    location ~* ^/ha/(.*)$ {
-        proxy_pass https://home-assistant/$1$is_args$args;
-    }
-
     location ~* ^/app1/(.*)$ {
         proxy_pass http://app1/$1$is_args$args;
     }
@@ -332,6 +328,10 @@ server {
 
     location ~* ^/nextcloud/(.*)$ {
         proxy_pass http://nextcloud-server/$1$is_args$args;
+    }
+
+    location ~* ^/homeassistant/(.*)$ {
+        proxy_pass https://home-assistant/$1$is_args$args;
     }
 
     location ~* ^/plex/(.*)$ {
